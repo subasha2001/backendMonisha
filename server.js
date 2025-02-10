@@ -26,7 +26,7 @@ app.use(
       'http://localhost:4200',
       'http://localhost:4000',
       'https://pw0l3d2z-4200.inc1.devtunnels.ms/',
-      "https://apsinfotech.in"
+      "https://cadyinfotech.com"
     ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
