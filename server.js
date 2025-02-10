@@ -25,7 +25,8 @@ app.use(
     origin: [
       'http://localhost:4200',
       'http://localhost:4000',
-      'https://pw0l3d2z-4200.inc1.devtunnels.ms/'
+      'https://pw0l3d2z-4200.inc1.devtunnels.ms/',
+      "https://apsinfotech.in/mt"
     ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
