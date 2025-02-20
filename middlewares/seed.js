@@ -1,16 +1,27 @@
 const mongoose = require('mongoose');
-const BrandModel = require('../models/Brand');
+const Coupon = require('../models/couponModel');
 
-const categories = [];
+const categories = [
+    { code: 'SWFJN7JASN' },
+    { code: 'SWFJN7JBSN' },
+    { code: 'SWFJN7JCSN' }
+];
 
 mongoose.connect('mongodb+srv://subasha:s0GeZmOZ7ZK1HLP5@cluster0.bkee1lo.mongodb.net/monishaTrades?retryWrites=true&w=majority&appName=Cluster0')
     .then(async () => {
         console.log('Connected to MongoDB');
-        await BrandModel.deleteMany();
-        await BrandModel.insertMany(categories);
+
+        await Coupon.deleteMany();
+
+        await Coupon.insertMany(categories);
         console.log('Categories seeded successfully');
-        mongoose.disconnect();
+
+        await mongoose.disconnect();
+        console.log('Disconnected from MongoDB');
     })
     .catch((err) => {
-        console.error('Error connecting to MongoDB', err);
+        console.error('Error connecting to MongoDB:', err);
+        mongoose.disconnect();
     });
+
+//node middlewares/seed.js

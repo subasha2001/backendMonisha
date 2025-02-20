@@ -1,12 +1,13 @@
-// routes/categoriesRouter.js
 const express = require('express');
 const asyncHandler = require('express-async-handler');
 const CategoryModel = require('../models/categories');
 const { ProductsModel } = require('../models/productsModel');
+const multer = require("multer");
+const fs = require("fs");
+const path = require("path");
 
 const router = express.Router();
 
-// GET all categories
 router.get(
     '/',
     asyncHandler(async (req, res) => {
@@ -41,53 +42,82 @@ router.get('/:name', async (req, res) => {
     }
 });
 
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const uploadDir = path.join(__dirname, "../uploads/subCategories");
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+        cb(null, file.originalname);
+    },
+});
+const upload = multer({ storage });
+
+router.post("/upload", upload.single("file"), (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    res.status(200).json({
+        imageUrl: `${req.file.filename}`,
+        message: 'File uploaded successfully',
+        filePath: `/uploads/subCategories/${req.file.originalname}`,
+    });
+});
+
 router.post(
     '/',
     asyncHandler(async (req, res) => {
-        console.log("Received body:", req.body); // Debugging line
+        try {
+            const { name, subcategories } = req.body;
 
-        const { name, subcategories } = req.body;
+            if (!name) {
+                return res.status(400).json({ message: 'Category name is required' });
+            }
 
-        if (!name || typeof name !== 'string' || name.trim() === '') {
-            return res.status(400).json({ message: 'Category name is required' });
+            const formattedSubcategories = subcategories.map(sub => ({
+                name: sub.name,
+                image: sub.image || '' // Default empty string if no image is provided
+            }));
+
+            const category = new CategoryModel({ name, subCategory: formattedSubcategories });
+            await category.save();
+            res.status(201).json({ message: 'Category added successfully', category });
+        } catch (error) {
+            res.status(500).json({ message: 'Error adding category', error });
         }
-
-        const newCategory = new CategoryModel({
-            name,
-            subCategory: subcategories
-        });
-
-        await newCategory.save();
-        res.status(201).json({ message: 'Category added successfully', newCategory });
     })
 );
 
-// CNC power supply-drives and motors, MCB-switchgear and contactor, Electronic tools and test equipment, Passive components
-
-// PUT (update) an existing category
 router.put(
     '/:id',
     asyncHandler(async (req, res) => {
-        const { id } = req.params;
-        const { name, subCate } = req.body;
-        console.log(req.body);
+        try {
+            const { name, subcategories } = req.body;
+            const { id } = req.params;
 
+            const formattedSubcategories = subcategories.map(sub => ({
+                name: sub.name,
+                image: sub.image || ''
+            }));
 
-        if (!name) {
-            return res.status(400).json({ message: 'Category name is required' });
+            const updatedCategory = await CategoryModel.findByIdAndUpdate(
+                id,
+                { name, subCategory: formattedSubcategories },
+                { new: true }
+            );
+
+            if (!updatedCategory) {
+                return res.status(404).json({ message: 'Category not found' });
+            }
+
+            res.json({ message: 'Category updated successfully', category: updatedCategory });
+        } catch (error) {
+            res.status(500).json({ message: 'Error updating category', error });
         }
-
-        const updatedCategory = await CategoryModel.findByIdAndUpdate(
-            id,
-            { name, subCategory: subCate },
-            { new: true }
-        );
-
-        if (!updatedCategory) {
-            return res.status(404).json({ message: 'Category not found' });
-        }
-
-        res.json({ message: 'Category updated successfully', updatedCategory });
     })
 );
 
@@ -108,26 +138,29 @@ router.put(
             return res.status(404).json({ message: 'Category not found' });
         }
 
-        category.subCategory = category.subCategory.filter(sub => sub !== subCategoryName);
+        category.subCategory = category.subCategory.filter(sub => sub.name !== subCategoryName);
         await category.save();
 
         res.json({ message: 'Subcategory removed successfully', category });
     })
 );
 
-// DELETE a category
 router.delete(
     '/:id',
     asyncHandler(async (req, res) => {
-        const { id } = req.params;
+        try {
+            const { id } = req.params;
 
-        const deletedCategory = await CategoryModel.findByIdAndDelete(id);
+            const deletedCategory = await CategoryModel.findByIdAndDelete(id);
 
-        if (!deletedCategory) {
-            return res.status(404).json({ message: 'Category not found' });
+            if (!deletedCategory) {
+                return res.status(404).json({ message: 'Category not found' });
+            }
+
+            res.json({ message: 'Category deleted successfully' });
+        } catch (error) {
+            res.status(500).json({ message: 'Error deleting category', error });
         }
-
-        res.json({ message: 'Category deleted successfully' });
     })
 );
 
@@ -135,22 +168,15 @@ router.delete(
 router.get(
     '/search',
     asyncHandler(async (req, res) => {
-        const { query } = req.query; // Get search query from query parameters
+        try {
+            const { query } = req.query;
 
-        if (!query) {
-            return res.status(400).json({ message: 'Search query is required' });
+            const categories = await CategoryModel.find({ name: { $regex: query, $options: 'i' } });
+
+            res.json(categories);
+        } catch (error) {
+            res.status(500).json({ message: 'Error searching categories', error });
         }
-
-        // Use regex to perform a case-insensitive search on category names
-        const categories = await CategoryModel.find({
-            name: { $regex: query, $options: 'i' },
-        });
-
-        if (categories.length === 0) {
-            return res.status(404).json({ message: 'No categories found' });
-        }
-
-        res.status(200).json({ categories });
     })
 );
 

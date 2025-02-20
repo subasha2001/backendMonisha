@@ -5,6 +5,7 @@ const { BannerModel } = require('../models/bannerModel');
 const fs = require("fs");
 const path = require("path");
 const { ProductsModel } = require('../models/productsModel');
+const NewsTickerModel = require('../models/newsticker')
 const { UserModel } = require('../models/userModel');
 const CategoryModel = require('../models/categories');
 const BrandModel = require('../models/Brand');
@@ -66,19 +67,55 @@ router.get("/", asyncHandler(async (req, res) => {
 
 router.get('/counts', async (req, res) => {
     try {
-      const productCount = await ProductsModel.countDocuments();
-      const userCount = await UserModel.countDocuments();
-      const categoryCount = await CategoryModel.countDocuments();
-      const brandCount = await BrandModel.countDocuments();
-  
-      res.json({
-        products: productCount,
-        users: userCount,
-        categories: categoryCount,
-        brands: brandCount,
-      });
+        const productCount = await ProductsModel.countDocuments();
+        const userCount = await UserModel.countDocuments();
+        const categoryCount = await CategoryModel.countDocuments();
+        const brandCount = await BrandModel.countDocuments();
+
+        res.json({
+            products: productCount,
+            users: userCount,
+            categories: categoryCount,
+            brands: brandCount,
+        });
     } catch (error) {
-      res.status(500).json({ error: 'Error fetching counts' });
+        res.status(500).json({ error: 'Error fetching counts' });
     }
-  });
+});
+
+//get newsticker
+router.get('/newsticker', async (req, res) => {
+    try {
+        const data = await NewsTickerModel.find();
+        res.json(data);
+    } catch (error) {
+        console.error("Error fetching news ticker:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
+//edit newsticker
+router.put('/newsticker/:id', async (req, res) => {
+    try {
+        const { newsticker } = req.body;
+        if (!newsticker) {
+            return res.status(400).json({ error: "News ticker text is required" });
+        }
+
+        const updatedTicker = await NewsTickerModel.findByIdAndUpdate(
+            req.params.id,
+            { newsticker: newsticker },
+            { new: true }
+        );
+
+        if (!updatedTicker) {
+            return res.status(404).json({ error: "News ticker not found" });
+        }
+
+        res.json({ message: "News ticker updated successfully", data: updatedTicker });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 module.exports = router;

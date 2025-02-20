@@ -79,4 +79,27 @@ const sendPaymentConfirmationEmailForAdmin = async (user, orderDetails) => {
   }
 };
 
-module.exports = {sendPaymentConfirmationEmailForAdmin, sendPaymentConfirmationEmailForUser}
+const sendLoginNotification = async (customerEmail) =>{
+  try {
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASSWORD,
+      },
+    });
+
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: 'subashinr.is@gmail.com',
+      subject: "Customer Login Alert",
+      text: `Customer with email ${customerEmail} has just logged in.`,
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log("Admin notified about customer login.");
+  } catch (error) {
+    console.error("Error sending email to admin:", error);
+  }
+}
+module.exports = {sendPaymentConfirmationEmailForAdmin, sendPaymentConfirmationEmailForUser, sendLoginNotification}

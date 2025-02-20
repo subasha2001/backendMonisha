@@ -1,79 +1,66 @@
 const { Router } = require("express");
-const asyncHandler = require("express-async-handler");
-const { HTTP_BAD_REQUEST } = require("../constants/http_status");
-const { OrderModel } = require("../models/orderModel");
-const { OrderStatus } = require("../constants/order_status");
-const auth = require("../middlewares/auth.mid");
-const Razorpay = require("razorpay");
-const { ProductsModel } = require("../models/productsModel");
-const { UserModel } = require("../models/userModel");
-const { sendPaymentConfirmationEmailForUser, sendPaymentConfirmationEmailForAdmin } = require("./mailerRouter");
-const crypto = require("crypto");
-const { authenticateToken, authorizeAdmin } = require("../middlewares/auth.mid");
+// const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 const router = Router();
 
-const paypal = require('paypal-rest-sdk');
-paypal.configure({
-  mode: 'sandbox',
-  client_id: 'AWWvY6QE1nkP_qJH9amBUv6OA6_SIyV4pnq2D7QNTxU7oTCvijXz0mTrhH_1OgsVr9iT8mPziyVPwpqO',
-  client_secret: 'EKSNCY4-rLuGpgGLkX1keOjMWTbYyPVDV_qllVTCSvfQpXZ97O_z1Hy3YKiH0zjXv1uJXF1SiXwM7HDs',
+router.post('/create', async (req, res) => {
+  try {
+    const { amount } = req.body;
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amount * 100,
+      currency: "usd",
+      payment_method_types: ["card"],
+    });
+
+    res.json({
+      success: true,
+      clientSecret: paymentIntent.client_secret,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
 });
 
-const razorpay = new Razorpay({
-  key_id: process.env.RPAY_KEY,
-  key_secret: process.env.RPAY_SECRET,
-});
+// router.post('/webhook', express.raw({ type: "application/json" }), async (req, res) => {
+//   const sig = req.headers["stripe-signature"];
 
-router.post('/create', (req, res) => {
-  const { total, currency, description } = req.body;
+//   let event;
+//   try {
+//     event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+//   } catch (err) {
+//     return res.status(400).json({ success: false, message: `Webhook error: ${err.message}` });
+//   }
 
-  const create_payment_json = {
-    intent: 'sale',
-    payer: {
-      payment_method: 'paypal',
-    },
-    redirect_urls: {
-      return_url: 'http://localhost:4200/success', // Angular success page
-      cancel_url: 'http://localhost:4200/cancel', // Angular cancel page
-    },
-    transactions: [
-      {
-        amount: {
-          currency: currency,
-          total: total,
-        },
-        description: description,
-      },
-    ],
-  };
+//   if (event.type === "payment_intent.succeeded") {
+//     const paymentIntent = event.data.object;
+//     console.log("✅ Payment successful:", paymentIntent);
 
-  paypal.payment.create(create_payment_json, (error, payment) => {
-    if (error) {
-      console.error(error);
-      res.status(500).json({ error: 'Payment creation failed.' });
-    } else {
-      const approvalUrl = payment.links.find((link) => link.rel === 'approval_url');
-      res.status(200).json({ approvalUrl: approvalUrl.href });
-    }
-  });
-});
+//     // Extract payment details
+//     const { id, amount_received, currency } = paymentIntent;
+//     const orderData = req.body.metadata; // Metadata from frontend
 
-router.post('/execute-payment', (req, res) => {
-  const { paymentId, payerId } = req.body;
+//     // ✅ Create and Save Order in Database
+//     const newOrder = new Order({
+//       userInfo: JSON.parse(orderData.userInfo),
+//       orderItems: JSON.parse(orderData.orderItems),
+//       payment: {
+//         transactionId: id,
+//         amount: amount_received / 100,
+//         currency,
+//         status: "Paid",
+//       },
+//       totalAmount: amount_received / 100,
+//     });
 
-  const execute_payment_json = {
-    payer_id: payerId,
-  };
+//     await newOrder.save();
 
-  paypal.payment.execute(paymentId, execute_payment_json, (error, payment) => {
-    if (error) {
-      console.error(error.response);
-      res.status(500).json({ error: 'Payment execution failed.' });
-    } else {
-      res.status(200).json({ success: true, payment });
-    }
-  });
-});
+//     console.log("✅ Order saved in database:", newOrder);
+//   } else {
+//     console.warn(`⚠️ Unhandled event type: ${event.type}`);
+//   }
+
+//   res.json({ success: true });
+// });
 
 module.exports = router;

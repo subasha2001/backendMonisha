@@ -10,7 +10,10 @@ const UserSchema = new Schema(
     address: { type: String, required: true },
     pincode: { type: Number, required: true },
     password: { type: String, required: true },
+    country: { type: String, required: true },
+    state: { type: String, required: true },
     token: { type: String },
+    coupon: { type: String },
     isActive: { type: Boolean, default: false },
     isAdmin: { type: Boolean, default: false }
   },

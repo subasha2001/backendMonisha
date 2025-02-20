@@ -4,7 +4,8 @@ const jwt = require("jsonwebtoken");
 const asyncHandler = require("express-async-handler");
 const { UserModel } = require("../models/userModel");
 const nodemailer = require("nodemailer");
-const { authenticateToken, authorizeAdmin } = require("../middlewares/auth.mid");
+const { sendLoginNotification } = require("./mailerRouter");
+const Coupon = require("../models/couponModel");
 
 const router = Router();
 
@@ -25,6 +26,8 @@ router.post(
         expiresIn: '1h',
       });
       const user = { ...users.toObject(), token };
+
+      await sendLoginNotification(email);
 
       res.status(200).json({ user });
     } catch (error) {
@@ -101,9 +104,9 @@ const sendRegistrationEmail = (user) => {
       html: recipient.template,
       attachments: [
         {
-          filename: 'goldPalaceLogo2.png',
-          path: './uploads/goldPalaceLogo2.png',
-          cid: 'goldPalaceLogo',
+          filename: 'logo.png',
+          path: './uploads/logo.png',
+          cid: 'MonishaTrades',
         },
       ],
     };
@@ -120,7 +123,7 @@ const sendRegistrationEmail = (user) => {
 
 const adminTemplate = (user) => `
   <div style="text-align: center;">
-    <img src="cid:goldPalaceLogo" alt="Monisha Trades logo" style="width: 150px; margin-bottom: 20px;" />
+    <img src="cid:MonishaTrades" alt="Monisha Trades logo" style="width: 150px; margin-bottom: 20px;" />
   </div>
   <p>A new user has registered.</p>
   <p><strong>Name:</strong> ${user.name}</p>
@@ -134,7 +137,7 @@ const adminTemplate = (user) => `
 
 const userTemplate = (user) => `
   <div style="text-align: center;">
-    <img src="cid:goldPalaceLogo" alt="Gold Palace Jewellery Logo" style="width: 150px; margin-bottom: 20px;" />
+    <img src="cid:MonishaTrades" alt="Monisha Trades Logo" style="width: 150px; margin-bottom: 20px;" />
   </div>
   <p>Welcome to Monisha Trades, ${user.name}!</p>
   <p>Thank you for registering with us.</p>
@@ -143,15 +146,54 @@ const userTemplate = (user) => `
   <p>+91 9025567759</p>
   <p>subashayyanar1@gmail.com</p>
 `
+const sendAdminNotificationEmail = (user, couponCode) => {
+  console.log('came to admin')
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: "subashayyanar1@gmail.com",
+    subject: "New User Registered with a Coupon Code",
+    text: `
+    Monisha Trades \n
+    Coupon Code applied user notification \n
+    User ${user.name} (${user.email}) has registered using the coupon code: ${couponCode}
+    `,
+  };
+
+  transporter.sendMail(mailOptions, (error, info) => {
+    if (error) {
+      console.error("Error sending admin email:", error);
+    } else {
+      console.log("Admin notified:", info.response);
+    }
+  });
+};
 
 router.post(
   "/register",
   asyncHandler(async (req, res) => {
-    const { name, number, email, password, address, pincode, cname } = req.body;
+    console.log(req.body);
+    
+    const { name, number, email, password, address, pincode, cname, coupon, country, state } = req.body;
 
     try {
       const existingUser = await UserModel.findOne({ email });
-      if (existingUser) return res.status(400).json({ message: 'Email already exists, Please Login' });
+      if (existingUser) {
+        return res.status(400).json({ message: "Email already exists, Please Login" });
+      }
+
+      let isCouponVerified = false;
+
+      if (coupon) {
+        const couponcode = await Coupon.findOne({ code: coupon });
+
+        if (!couponcode) {
+          console.log('Invalid or expired coupon code');
+          return res.status(400).json({ message: "Invalid or expired coupon code" });
+        }
+
+        await Coupon.deleteOne({ code: coupon });
+        isCouponVerified = true;
+      }
 
       const user = new UserModel({
         email,
@@ -161,17 +203,24 @@ router.post(
         address,
         pincode,
         password,
+        country,
+        state,
         isActive: false,
       });
 
       await user.save();
       sendRegistrationEmail(user);
-      res.status(201).json({ 
-        message: 'Customer registered successfully',
-        user
+
+      if (isCouponVerified) {
+        sendAdminNotificationEmail(user, coupon);
+      }
+
+      res.status(201).json({
+        message: "Customer registered successfully",
+        user,
       });
     } catch (error) {
-      res.status(500).json({ message: 'Error registering customer' });
+      res.status(500).json({ message: "Error registering customer" });
     }
   })
 );
