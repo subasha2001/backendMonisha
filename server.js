@@ -31,12 +31,8 @@ app.use(
     ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
-      'Access-Control-Allow-Origin',
       'Content-Type',
-      'Authorization',
-      'Bearer_Token',
-      'X-Requested-With',
-      'Accept',
+      'Authorization'
     ],
     credentials: true,
   })
