@@ -1,66 +1,115 @@
-const { Router } = require("express");
-// const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+const express = require("express");
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+const Order = require("../models/orderModel");
 
-const router = Router();
+const router = express.Router();
 
-router.post('/create', async (req, res) => {
+router.post("/create", async (req, res) => {
   try {
-    const { amount } = req.body;
+    const { amount, billingDetails, cartItems } = req.body;
 
+    if (!amount || amount <= 0 || !cartItems || cartItems.length === 0) {
+      return res.status(400).json({ success: false, message: "Invalid order data" });
+    }
+
+    // ✅ Step 1: Create Order with `null` transactionId
+    const newOrder = new Order({
+      userInfo: billingDetails,
+      orderItems: cartItems.map(item => ({
+        product: item._id,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity
+      })),
+      payment: {
+        transactionId: null, // ✅ Initially null
+        amount: amount,
+        currency: "usd",
+        status: "Pending"
+      },
+      totalAmount: amount
+    });
+
+    await newOrder.save();
+
+    // ✅ Step 2: Create Stripe Payment Intent
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: amount * 100,
+      amount: Math.round(amount * 100),
       currency: "usd",
       payment_method_types: ["card"],
+      metadata: {
+        orderId: newOrder._id.toString(),
+        userEmail: billingDetails.email
+      }
     });
+
+    // ✅ Step 3: Update Order with Stripe Transaction ID
+    newOrder.payment.transactionId = paymentIntent.id;
+    await newOrder.save();
 
     res.json({
       success: true,
-      clientSecret: paymentIntent.client_secret,
+      message: "Order created successfully!",
+      orderId: newOrder._id,
+      clientSecret: paymentIntent.client_secret
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("❌ Order Creation Error:", error);
+    res.status(500).json({ success: false, message: "Order creation failed" });
   }
 });
 
-// router.post('/webhook', express.raw({ type: "application/json" }), async (req, res) => {
-//   const sig = req.headers["stripe-signature"];
+router.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+  console.log("🔍 Incoming Webhook Event:", req.body);
+  
+  const sig = req.headers["stripe-signature"];
 
-//   let event;
-//   try {
-//     event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
-//   } catch (err) {
-//     return res.status(400).json({ success: false, message: `Webhook error: ${err.message}` });
-//   }
+  let event;
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+  } catch (err) {
+    console.error("❌ Webhook signature verification failed:", err.message);
+    return res.status(400).json({ success: false, message: `Webhook error: ${err.message}` });
+  }
 
-//   if (event.type === "payment_intent.succeeded") {
-//     const paymentIntent = event.data.object;
-//     console.log("✅ Payment successful:", paymentIntent);
+  console.log(`✅ Stripe Event Received: ${event.type}`);
 
-//     // Extract payment details
-//     const { id, amount_received, currency } = paymentIntent;
-//     const orderData = req.body.metadata; // Metadata from frontend
+  if (event.type === "payment_intent.succeeded") {
+    const paymentIntent = event.data.object;
+    console.log("✅ Payment successful:", paymentIntent);
 
-//     // ✅ Create and Save Order in Database
-//     const newOrder = new Order({
-//       userInfo: JSON.parse(orderData.userInfo),
-//       orderItems: JSON.parse(orderData.orderItems),
-//       payment: {
-//         transactionId: id,
-//         amount: amount_received / 100,
-//         currency,
-//         status: "Paid",
-//       },
-//       totalAmount: amount_received / 100,
-//     });
+    try {
+      // Start transaction to update order safely
+      const session = await Order.startSession();
+      session.startTransaction();
 
-//     await newOrder.save();
+      const order = await Order.findOneAndUpdate(
+        { "payment.transactionId": paymentIntent.id },
+        { $set: { "payment.status": "Paid" } },
+        { new: true, session }
+      );
 
-//     console.log("✅ Order saved in database:", newOrder);
-//   } else {
-//     console.warn(`⚠️ Unhandled event type: ${event.type}`);
-//   }
+      if (!order) {
+        await session.abortTransaction();
+        session.endSession();
+        console.error("❌ Order not found for Payment Intent ID:", paymentIntent.id);
+        return res.status(404).json({ success: false, message: "Order not found" });
+      }
 
-//   res.json({ success: true });
-// });
+      await session.commitTransaction();
+      session.endSession();
+
+      console.log("✅ Order payment updated successfully:", order);
+      return res.json({ success: true, message: "Payment verified, order updated" });
+    } catch (err) {
+      console.error("❌ Error updating order payment:", err);
+      return res.status(500).json({ success: false, message: "Payment update failed" });
+    }
+  } else {
+    console.warn(`⚠️ Unhandled Stripe event: ${event.type}`);
+  }
+
+  res.sendStatus(200);
+});
 
 module.exports = router;

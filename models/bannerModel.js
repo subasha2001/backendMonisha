@@ -34,7 +34,14 @@ const ReviewSchema = new Schema(
   }
 );
 
+const CurrencySchema = new Schema(
+  {
+    currency: { type: Number, required: true }
+  }
+)
+
+const Currency = model('currency', CurrencySchema);
 const BannerModel = model('banner', BannerSchema);
 const ReviewModel = model('reviews', ReviewSchema);
 
-module.exports = { BannerModel, ReviewModel };
+module.exports = { BannerModel, ReviewModel, Currency };

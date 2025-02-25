@@ -1,7 +1,7 @@
 const express = require('express');
 const asyncHandler = require('express-async-handler');
 const multer = require("multer");
-const { BannerModel } = require('../models/bannerModel');
+const { BannerModel, Currency } = require('../models/bannerModel');
 const fs = require("fs");
 const path = require("path");
 const { ProductsModel } = require('../models/productsModel');
@@ -12,13 +12,11 @@ const BrandModel = require('../models/Brand');
 
 const router = express.Router();
 
-// Delete banner by productId
 router.delete('/:productId', (req, res) => {
     BannerModel.deleteOne({ _id: req.params.productId }).then(result => { });
     res.status(200).json({ message: 'Banner deleted!' });
 });
 
-// Multer storage configuration
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const uploadDir = path.join(__dirname, "../uploads/banners");
@@ -33,14 +31,12 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// Handle image upload
 router.post("/upload", upload.single("image"), (req, res) => {
     res.json({
         imageUrl: `${req.file.filename}`,
     });
 });
 
-// Add new banner
 router.post("/addBanner", asyncHandler(
     async (req, res) => {
         const { image } = req.body;
@@ -59,7 +55,6 @@ router.post("/addBanner", asyncHandler(
     }
 ));
 
-// Get all banners
 router.get("/", asyncHandler(async (req, res) => {
     const bannerImages = await BannerModel.find();
     res.send(bannerImages);
@@ -83,7 +78,6 @@ router.get('/counts', async (req, res) => {
     }
 });
 
-//get newsticker
 router.get('/newsticker', async (req, res) => {
     try {
         const data = await NewsTickerModel.find();
@@ -94,7 +88,6 @@ router.get('/newsticker', async (req, res) => {
     }
 });
 
-//edit newsticker
 router.put('/newsticker/:id', async (req, res) => {
     try {
         const { newsticker } = req.body;
@@ -115,6 +108,44 @@ router.put('/newsticker/:id', async (req, res) => {
         res.json({ message: "News ticker updated successfully", data: updatedTicker });
     } catch (error) {
         res.status(500).json({ error: error.message });
+    }
+});
+
+router.get("/currency/", async (req, res) => {
+    const number = await Currency.findOne();
+    res.json(number);
+});
+
+router.post("/currency/", async (req, res) => {
+    const { value } = req.body;
+    let number = await Currency.findOne();
+
+    if (number) {
+        number.value = value;
+    } else {
+        number = new Currency({ currency: value });
+    }
+
+    await number.save();
+    res.json({ message: "Number updated successfully", number });
+});
+
+router.put("/currency/:id", async (req, res) => {
+    try {
+        const { value } = req.body;
+        const updatedCurrency = await Currency.findByIdAndUpdate(
+            req.params.id,
+            { currency: value },
+            { new: true, runValidators: true }
+        );
+
+        if (!updatedCurrency) {
+            return res.status(404).json({ error: "Currency not found" });
+        }
+
+        res.json({ message: "Currency updated successfully", updatedCurrency });
+    } catch (error) {
+        res.status(500).json({ error: "Internal Server Error" });
     }
 });
 

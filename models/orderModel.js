@@ -1,56 +1,33 @@
-const { model, Schema, Types } = require("mongoose");
+const mongoose = require("mongoose");
 
-const ProductSchema = new Schema(
-  {
-    name: { type: String, required: true, minlength: 5 },
-    imageDis: { type: String, required: true },
-    imageHov: { type: String, required: true },
-    description: { type: String },
-    metalType: { type: [String], required: true },
-    category: { type: [String], required: true },
-    weight: { type: Number, min: 0 },
-    size: { type: Number, min: 0 },
-    stock: { type: Number, required: true, min: 0 },
-    wastage: { type: Number, min: 0 },
-    price: { type: Number, min: 0 },
+const Product = require("./productsModel");
+
+const OrderSchema = new mongoose.Schema({
+  userInfo: {
+    name: { type: String, required: true },
+    cname: { type: String, required: true },
+    email: { type: String, required: true },
+    address: { type: String, required: true },
+    state: { type: String, required: true },
+    zipcode: { type: String, required: true },
+    country: { type: String, required: true }
   },
-  {
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true },
-    timestamps: true,
-  }
-);
-
-const OrderItemSchema = new Schema({
-  product: { type: ProductSchema, required: true },
-  price: { type: Number, required: true },
-  quantity: { type: Number, required: true },
+  orderItems: [
+    {
+      product: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },
+      name: { type: String, required: true },
+      price: { type: Number, required: true },
+      quantity: { type: Number, required: true }
+    }
+  ],
+  payment: {
+    transactionId: { type: String, default: null },
+    amount: { type: Number, required: true },
+    currency: { type: String, required: true },
+    status: { type: String, enum: ["Pending", "Paid", "Failed"], default: "Pending" }
+  },
+  totalAmount: { type: Number, required: true },
+  createdAt: { type: Date, default: Date.now }
 });
 
-const OrderSchema = new Schema(
-  {
-    name: { type: String, required: true },
-    address: { type: String, required: true },
-    pincode: { type: Number, required: true },
-    razorpayOrderId: { type: String, required: true },
-    razorpayPaymentId: { type: String },
-    razorpaySignature: { type: String },
-    totalPrice: { type: Number, required: true },
-    items: { type: [OrderItemSchema], required: true },
-    status: { type: String, default: 'NEW' },
-    user: { type: Schema.Types.ObjectId, required: true },
-  },
-  {
-    timestamps: true,
-    toJSON: {
-      virtuals: true,
-    },
-    toObject: {
-      virtuals: true,
-    },
-  }
-);
-
-const OrderModel = model("order", OrderSchema);
-
-module.exports = { OrderModel };
+module.exports = mongoose.model("Order", OrderSchema);

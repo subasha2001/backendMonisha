@@ -29,7 +29,7 @@
     "nodemailer": "^6.9.16",
     "paypal-rest-sdk": "^1.8.1",
     "razorpay": "^2.9.5",
-    "stripe": "^17.6.0",
+    "stripe": "^17.7.0",
     "twilio": "^5.4.0",
     "typescript": "^5.5.4",
     "uuid": "^11.0.5",
