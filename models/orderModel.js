@@ -1,7 +1,5 @@
 const mongoose = require("mongoose");
 
-const Product = require("./productsModel");
-
 const OrderSchema = new mongoose.Schema({
   userInfo: {
     name: { type: String, required: true },
@@ -16,6 +14,7 @@ const OrderSchema = new mongoose.Schema({
     {
       product: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },
       name: { type: String, required: true },
+      images: { type: String, required: true },
       price: { type: Number, required: true },
       quantity: { type: Number, required: true }
     }
@@ -24,9 +23,10 @@ const OrderSchema = new mongoose.Schema({
     transactionId: { type: String, default: null },
     amount: { type: Number, required: true },
     currency: { type: String, required: true },
-    status: { type: String, enum: ["Pending", "Paid", "Failed"], default: "Pending" }
+    status: { type: String, default: "Pending" }
   },
   totalAmount: { type: Number, required: true },
+  totalQuantity: { type: Number, required: true },
   createdAt: { type: Date, default: Date.now }
 });
 

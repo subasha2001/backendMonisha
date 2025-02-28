@@ -15,7 +15,9 @@ const UserSchema = new Schema(
     token: { type: String },
     coupon: { type: String },
     isActive: { type: Boolean, default: false },
-    isAdmin: { type: Boolean, default: false }
+    isAdmin: { type: Boolean, default: false },
+    resetPasswordToken: { type:String },
+    resetPasswordExpires: { type: Number }
   },
   {
     timestamps: true,

@@ -1,5 +1,6 @@
 const { Router } = require("express");
 const bcrypt = require('bcrypt');
+const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const asyncHandler = require("express-async-handler");
 const { UserModel } = require("../models/userModel");
@@ -41,8 +42,11 @@ router.post(
   asyncHandler(async (req, res) => {
     const { email, password } = req.body;
     try {
-      const admin = await UserModel.findOne({ email, isAdmin: true, password });
-      if (!admin) return res.status(404).json({ message: 'Invalid Credentials' });
+      const admin = await UserModel.findOne({ email, isAdmin: true });
+      if (!admin) return res.status(404).json({ message: 'Admin not found' });
+
+      const isPasswordValid = await bcrypt.compare(password, admin.password);
+      if (!isPasswordValid) return res.status(401).json({ message: 'Invalid credentials' });
 
       const token = jwt.sign({ id: admin._id, isAdmin: admin.isAdmin }, process.env.JWT_SECRET, {
         expiresIn: '1h',
@@ -51,6 +55,8 @@ router.post(
 
       res.status(200).json({ token, admiN, message: "Admin Logged In Successfully" });
     } catch (error) {
+      console.log(error);
+      
       res.status(500).json({ message: 'Error logging in admin' });
     }
   })
@@ -251,4 +257,76 @@ router.put(
     }
   })
 );
+
+router.post("/forgot-password", async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    const user = await UserModel.findOne({ email });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const hashedToken = crypto.createHash("sha256").update(resetToken).digest("hex");
+
+    user.resetPasswordToken = hashedToken;
+    user.resetPasswordExpires = Date.now() + 3600000;
+    await user.save();
+
+    const transporter = nodemailer.createTransport({
+      service: "Gmail",
+      auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASSWORD },
+    });
+
+    const resetUrl = `${process.env.FRONTEND_URL}reset-password/${resetToken}`;
+
+    const mailOptions = {
+      from: "noreply@monishatrades.com",
+      to: user.email,
+      subject: "Password Reset Request",
+      text: `You requested a password reset. Click the link to reset your password: ${resetUrl}`,
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    res.json({ message: "Password reset link sent to your email." });
+  } catch (error) {
+    console.log(error);
+    
+    res.status(500).json({ message: "Error sending reset link" });
+  }
+});
+
+// 💡 Step 2: Reset Password
+router.post("/reset-password/:token", async (req, res) => {
+  const { password } = req.body;
+  const hashedToken = crypto.createHash("sha256").update(req.params.token).digest("hex");
+
+  try {
+    const user = await UserModel.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpires: { $gt: Date.now() },
+    });
+
+    if (!user) return res.status(400).json({ message: "Invalid or expired token" });
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    await UserModel.findOneAndUpdate(
+      { _id: user._id },
+      {
+        password: hashedPassword,
+        resetPasswordToken: null,
+        resetPasswordExpires: null,
+      },
+      { new: true, runValidators: false }
+    );
+
+    res.json({ message: "Password has been reset successfully." });
+  } catch (error) {
+    console.error("❌ Reset Password Error:", error);
+    res.status(500).json({ message: "Error resetting password" });
+  }
+});
+
 module.exports = router;
