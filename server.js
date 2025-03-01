@@ -28,7 +28,7 @@ app.use(
       'http://localhost:4200',
       'http://localhost:4000',
       "https://cadyinfotech.com",
-      "http://monishatrades.cadyinfotech.com"
+      "https://monishatrades.cadyinfotech.com"
     ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
