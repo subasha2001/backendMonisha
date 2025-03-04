@@ -94,4 +94,26 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
+router.get("/search/:searchTerm", async (req, res) => {
+  try {
+    const query = req.params.searchTerm;
+    if (!query) return res.status(400).json({ error: "Search query is required" });
+
+    const pdfs = await Pdf.find({
+      $or: [
+        { name: { $regex: query, $options: "i" } },
+        { category: { $regex: query, $options: "i" } },
+        { productFamily: { $regex: query, $options: "i" } }
+      ]
+    });
+
+    if (pdfs.length === 0) {
+      return res.status(404).json({ error: "File not found" });
+    }
+    res.json(pdfs);
+  } catch (error) {
+    res.status(500).json({ error: "Search Failed" });
+  }
+});
+
 module.exports = router;

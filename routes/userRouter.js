@@ -15,7 +15,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const { email, password } = req.body;
     try {
-      const users = await UserModel.findOne({ email, isAdmin: false });
+      const users = await UserModel.findOne({ email });
       if (!users) return res.status(404).json({ message: 'Customer not found' });
 
       if (!users.isActive) return res.status(403).json({ message: 'Account not activated. Please contact admin.' });
@@ -64,7 +64,7 @@ router.post(
 
 router.get('/', async (req, res) => {
   try {
-    const users = await UserModel.find();
+    const users = await UserModel.find().select("+password");
     res.status(200).json(users);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching users', error });
@@ -296,7 +296,6 @@ router.post("/forgot-password", async (req, res) => {
   }
 });
 
-// 💡 Step 2: Reset Password
 router.post("/reset-password/:token", async (req, res) => {
   const { password } = req.body;
   const hashedToken = crypto.createHash("sha256").update(req.params.token).digest("hex");

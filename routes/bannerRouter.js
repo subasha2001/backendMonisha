@@ -9,6 +9,7 @@ const NewsTickerModel = require('../models/newsticker')
 const { UserModel } = require('../models/userModel');
 const CategoryModel = require('../models/categories');
 const BrandModel = require('../models/Brand');
+const Order = require('../models/orderModel')
 
 const router = express.Router();
 
@@ -66,12 +67,14 @@ router.get('/counts', async (req, res) => {
         const userCount = await UserModel.countDocuments();
         const categoryCount = await CategoryModel.countDocuments();
         const brandCount = await BrandModel.countDocuments();
+        const ordersCount = await Order.countDocuments();
 
         res.json({
             products: productCount,
             users: userCount,
             categories: categoryCount,
             brands: brandCount,
+            orders: ordersCount
         });
     } catch (error) {
         res.status(500).json({ error: 'Error fetching counts' });
